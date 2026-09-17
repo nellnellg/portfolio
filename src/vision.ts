@@ -21,7 +21,7 @@ export interface VisionSessionAdapter {
 export class ManualVisionAdapter implements VisionSessionAdapter {
   private listener?: (update: VisionUpdate) => void;
 
-  async start(): Promise<void> {
+  async start(_mode: CameraMode): Promise<void> {
     this.listener?.({ confidence: 0.92, framingReady: true });
   }
 

@@ -79,8 +79,8 @@ function AppButton({
   kind?: "primary" | "secondary" | "ghost";
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.button, styles["button_" + kind]]}>
-      <Text style={[styles.buttonText, styles["buttonText_" + kind]]}>{label}</Text>
+    <Pressable onPress={onPress} style={[styles.button, kind === "primary" ? styles.button_primary : kind === "secondary" ? styles.button_secondary : styles.button_ghost]}>
+      <Text style={[styles.buttonText, kind === "primary" ? styles.buttonText_primary : kind === "secondary" ? styles.buttonText_secondary : styles.buttonText_ghost]}>{label}</Text>
     </Pressable>
   );
 }

@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Ball Control Coach",
+    "slug": "ball-control-coach",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nellnellg.ballcontrolcoach"
+    },
+    "plugins": [],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

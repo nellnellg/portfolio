@@ -1,3 +1,4 @@
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -111,6 +112,8 @@ export default function App() {
   const [sessionStart, setSessionStart] = useState<Date | null>(null);
   const [completedSession, setCompletedSession] = useState<TrainingSession | null>(null);
   const [adjustment, setAdjustment] = useState(0);
+  const [cameraDenied, setCameraDenied] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const adapter = useRef(new ManualVisionAdapter()).current;
 
   useEffect(() => {
@@ -128,6 +131,16 @@ export default function App() {
   );
 
   const beginSession = async () => {
+    const permission = cameraPermission?.granted
+      ? cameraPermission
+      : await requestCameraPermission();
+
+    if (!permission.granted) {
+      setCameraDenied(true);
+      return;
+    }
+
+    setCameraDenied(false);
     setTouches([]);
     setElapsed(0);
     setAdjustment(0);
@@ -205,6 +218,12 @@ export default function App() {
           </View>
 
           <Text style={styles.sectionTitle}>Ready to train?</Text>
+          {cameraDenied && (
+            <View style={styles.permissionCard}>
+              <Text style={styles.permissionTitle}>Camera access is needed</Text>
+              <Text style={styles.permissionText}>Allow camera access in iPhone Settings to use the live training view.</Text>
+            </View>
+          )}
           <View style={styles.modeRow}>
             <Pressable onPress={() => setCameraMode("tripod")} style={[styles.modeOption, cameraMode === "tripod" && styles.modeActive]}>
               <Text style={styles.modeIcon}>▣</Text>
@@ -236,16 +255,22 @@ export default function App() {
           <View style={styles.trainingHeader}>
             <Pressable onPress={() => setScreen("home")}><Text style={styles.close}>×</Text></Pressable>
             <View><Text style={styles.live}>● LIVE SESSION</Text><Text style={styles.timer}>{formatTime(elapsed)}</Text></View>
-            <Text style={styles.confidence}>92%<Text style={styles.confidenceSub}> track</Text></Text>
+            <Text style={styles.confidence}>ON<Text style={styles.confidenceSub}> camera</Text></Text>
           </View>
 
           <View style={styles.cameraFrame}>
-            <View style={styles.gridLineHorizontal} />
-            <View style={styles.gridLineVertical} />
-            <Text style={styles.frameText}>Camera vision preview</Text>
-            <Text style={styles.frameSub}>Keep the ball and both ankles in frame</Text>
-            <View style={styles.ball}><Text>⚽</Text></View>
-            <View style={styles.ankleRow}><View style={styles.ankleDot} /><View style={styles.ankleDot} /></View>
+            <CameraView
+              active
+              autofocus="on"
+              facing={cameraMode === "tripod" ? "back" : "front"}
+              style={styles.cameraPreview}
+            />
+            <View pointerEvents="none" style={styles.gridLineHorizontal} />
+            <View pointerEvents="none" style={styles.gridLineVertical} />
+            <View pointerEvents="none" style={styles.cameraGuidance}>
+              <Text style={styles.frameText}>Keep ball + ankles in frame</Text>
+              <Text style={styles.frameSub}>Live camera · vision tracking coming next</Text>
+            </View>
           </View>
 
           <View style={styles.liveCount}>
@@ -357,6 +382,9 @@ const styles = StyleSheet.create({
   sectionTitle: { color: "#F4FFF8", fontSize: 20, fontWeight: "800" },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 },
   link: { color: "#78F7B2", fontWeight: "700" },
+  permissionCard: { backgroundColor: "#3B2B10", borderWidth: 1, borderColor: "#8E6C25", borderRadius: 16, padding: 14 },
+  permissionTitle: { color: "#FFE19A", fontWeight: "800" },
+  permissionText: { color: "#E3C982", fontSize: 12, lineHeight: 17, marginTop: 4 },
   modeRow: { flexDirection: "row", gap: 12 },
   modeOption: { flex: 1, padding: 16, borderRadius: 18, borderWidth: 1, borderColor: "#284339", backgroundColor: "#0D1B16" },
   modeActive: { borderColor: "#78F7B2", backgroundColor: "#113124" },
@@ -384,13 +412,12 @@ const styles = StyleSheet.create({
   confidence: { color: "#F4FFF8", fontWeight: "800", textAlign: "right" },
   confidenceSub: { color: "#8FA39A", fontWeight: "500", fontSize: 11 },
   cameraFrame: { flex: 1, minHeight: 290, backgroundColor: "#12281F", borderRadius: 24, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#315A49" },
+  cameraPreview: { ...StyleSheet.absoluteFillObject },
+  cameraGuidance: { position: "absolute", top: 18, left: 18, right: 18, backgroundColor: "rgba(8, 18, 15, 0.72)", borderRadius: 12, padding: 12 },
   gridLineHorizontal: { position: "absolute", width: "100%", height: 1, backgroundColor: "#315A49" },
   gridLineVertical: { position: "absolute", height: "100%", width: 1, backgroundColor: "#315A49" },
   frameText: { color: "#C2D9CE", fontWeight: "800", fontSize: 16 },
   frameSub: { color: "#85A496", fontSize: 12, marginTop: 7 },
-  ball: { position: "absolute", top: "28%", right: "33%", width: 42, height: 42, borderRadius: 21, backgroundColor: "#D5FF61", alignItems: "center", justifyContent: "center" },
-  ankleRow: { position: "absolute", bottom: 38, flexDirection: "row", gap: 60 },
-  ankleDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#78F7B2", borderWidth: 3, borderColor: "#18442D" },
   liveCount: { alignItems: "center", marginTop: -2 },
   countNumber: { color: "#F4FFF8", fontSize: 48, fontWeight: "900", lineHeight: 50 },
   countLabel: { color: "#78F7B2", fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },

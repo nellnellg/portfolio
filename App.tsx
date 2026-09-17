@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   confidence: { color: "#F4FFF8", fontWeight: "800", textAlign: "right" },
   confidenceSub: { color: "#8FA39A", fontWeight: "500", fontSize: 11 },
   cameraFrame: { flex: 1, minHeight: 290, backgroundColor: "#12281F", borderRadius: 24, overflow: "hidden", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#315A49" },
-  cameraPreview: { ...StyleSheet.absoluteFillObject },
+  cameraPreview: { ...StyleSheet.absoluteFill },
   cameraGuidance: { position: "absolute", top: 18, left: 18, right: 18, backgroundColor: "rgba(8, 18, 15, 0.72)", borderRadius: 12, padding: 12 },
   gridLineHorizontal: { position: "absolute", width: "100%", height: 1, backgroundColor: "#315A49" },
   gridLineVertical: { position: "absolute", height: "100%", width: 1, backgroundColor: "#315A49" },

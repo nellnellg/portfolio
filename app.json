@@ -9,7 +9,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.nellnellg.ballcontrolcoach"
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Ball Control Coach to use your camera for live training sessions.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": false
     }

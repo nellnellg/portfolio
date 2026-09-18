@@ -170,7 +170,7 @@ export default function App() {
   };
 
   const startRecording = () => {
-    if (!cameraReady || !cameraRef.current || recordingPromise.current) return;
+    if (!cameraRef.current || recordingPromise.current) return;
 
     try {
       setIsRecording(true);
@@ -342,13 +342,13 @@ export default function App() {
           </View>
 
           <View style={styles.manualCard}>
-            <Text style={styles.manualTitle}>{isRecording ? "Recording session" : cameraReady ? "Camera ready" : "Preparing camera"}</Text>
-            <Text style={styles.manualText}>{isRecording ? "Keep the ball and both ankles visible. Finish when your round is complete." : cameraReady ? "Tap Start recording when you are positioned and ready." : "Waiting for the iPhone camera to finish starting."}</Text>
+            <Text style={styles.manualTitle}>{isRecording ? "Recording session" : "Camera preview"}</Text>
+            <Text style={styles.manualText}>{isRecording ? "Keep the ball and both ankles visible. Finish when your round is complete." : "Once you can see the live preview, tap Start recording when you are positioned and ready."}</Text>
           </View>
           {isRecording ? (
             <AppButton label={isAnalyzing ? "Analyzing session…" : "Finish & analyze"} onPress={finishSession} />
           ) : (
-            <AppButton label={cameraReady ? "Start recording" : "Preparing camera…"} onPress={startRecording} />
+            <AppButton label="Start recording" onPress={startRecording} />
           )}
         </View>
       )}

@@ -17,6 +17,7 @@ import {
   TrainingSession
 } from "./src/domain";
 import { recommendDrill } from "./src/recommendations";
+import { analyzeTrainingClip } from "./src/visionApi";
 import { ManualVisionAdapter } from "./src/vision";
 
 type Screen = "home" | "training" | "results" | "progress";
@@ -114,7 +115,13 @@ export default function App() {
   const [adjustment, setAdjustment] = useState(0);
   const [cameraDenied, setCameraDenied] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const cameraRef = useRef<CameraView>(null);
+  const recordingPromise = useRef<Promise<{ uri: string } | undefined> | null>(null);
   const adapter = useRef(new ManualVisionAdapter()).current;
+  const visionApiUrl = process.env.EXPO_PUBLIC_VISION_API_URL;
 
   useEffect(() => {
     if (screen !== "training") return;
@@ -141,6 +148,7 @@ export default function App() {
     }
 
     setCameraDenied(false);
+    setAnalysisError(null);
     setTouches([]);
     setElapsed(0);
     setAdjustment(0);
@@ -159,22 +167,60 @@ export default function App() {
     setTouches((items) => [...items, event]);
   };
 
+  const startRecording = () => {
+    if (!cameraRef.current || recordingPromise.current) return;
+    setIsRecording(true);
+    recordingPromise.current = cameraRef.current.recordAsync({ maxDuration: 120 });
+    recordingPromise.current
+      .catch(() => setAnalysisError("The camera could not record this session."))
+      .finally(() => setIsRecording(false));
+  };
+
   const finishSession = async () => {
+    setIsAnalyzing(true);
+    cameraRef.current?.stopRecording();
+    const clip = await recordingPromise.current;
+    recordingPromise.current = null;
     await adapter.stop();
+
+    let detectedTouches = touches;
+    let durationSeconds = Math.max(elapsed, 1);
+    let confidence = touches.length ? 0.92 : 0.68;
+    let detectedBestStreak = bestStreak(touches);
+    let leftTouches = counts.left;
+    let rightTouches = counts.right;
+
+    if (clip?.uri && visionApiUrl) {
+      try {
+        const analysis = await analyzeTrainingClip(visionApiUrl, clip.uri);
+        detectedTouches = analysis.touches;
+        durationSeconds = analysis.durationSeconds;
+        confidence = analysis.trackingConfidence;
+        detectedBestStreak = analysis.bestStreak;
+        leftTouches = analysis.leftTouches;
+        rightTouches = analysis.rightTouches;
+      } catch {
+        setAnalysisError("Analysis was unavailable. Check that the local vision service is running.");
+      }
+    } else if (!visionApiUrl) {
+      setAnalysisError("Automatic analysis needs a local vision-service address.");
+    }
+
     const session: TrainingSession = {
       id: "session-" + Date.now(),
       createdAt: (sessionStart ?? new Date()).toISOString(),
-      durationSeconds: Math.max(elapsed, 1),
+      durationSeconds,
       cameraMode,
-      touches,
-      totalTouches: touches.length,
-      bestStreak: bestStreak(touches),
-      leftTouches: counts.left,
-      rightTouches: counts.right,
-      trackingConfidence: touches.length ? 0.92 : 0.68,
+      touches: detectedTouches,
+      totalTouches: detectedTouches.length,
+      bestStreak: detectedBestStreak,
+      leftTouches,
+      rightTouches,
+      trackingConfidence: confidence,
       correctionDelta: 0
     };
     setCompletedSession(session);
+    setIsAnalyzing(false);
     setScreen("results");
   };
 
@@ -255,7 +301,7 @@ export default function App() {
           <View style={styles.trainingHeader}>
             <Pressable onPress={() => setScreen("home")}><Text style={styles.close}>×</Text></Pressable>
             <View><Text style={styles.live}>● LIVE SESSION</Text><Text style={styles.timer}>{formatTime(elapsed)}</Text></View>
-            <Text style={styles.confidence}>ON<Text style={styles.confidenceSub}> camera</Text></Text>
+            <Text style={styles.confidence}>{isRecording ? "REC" : "ON"}<Text style={styles.confidenceSub}> camera</Text></Text>
           </View>
 
           <View style={styles.cameraFrame}>
@@ -263,13 +309,15 @@ export default function App() {
               active
               autofocus="on"
               facing={cameraMode === "tripod" ? "back" : "front"}
+              onCameraReady={startRecording}
+              ref={cameraRef}
               style={styles.cameraPreview}
             />
             <View pointerEvents="none" style={styles.gridLineHorizontal} />
             <View pointerEvents="none" style={styles.gridLineVertical} />
             <View pointerEvents="none" style={styles.cameraGuidance}>
               <Text style={styles.frameText}>Keep ball + ankles in frame</Text>
-              <Text style={styles.frameSub}>Live camera · vision tracking coming next</Text>
+              <Text style={styles.frameSub}>{isRecording ? "Recording for automatic analysis" : "Preparing camera"}</Text>
             </View>
           </View>
 
@@ -280,14 +328,10 @@ export default function App() {
           </View>
 
           <View style={styles.manualCard}>
-            <Text style={styles.manualTitle}>Prototype touch controls</Text>
-            <Text style={styles.manualText}>The native camera model will report touches here. Use these to explore the session flow.</Text>
-            <View style={styles.touchButtons}>
-              <AppButton label="Left touch" kind="secondary" onPress={() => addTouch("left")} />
-              <AppButton label="Right touch" kind="secondary" onPress={() => addTouch("right")} />
-            </View>
+            <Text style={styles.manualTitle}>Automatic analysis</Text>
+            <Text style={styles.manualText}>Your clip is analyzed when you finish. The video is deleted by the local service after processing.</Text>
           </View>
-          <AppButton label="Finish session" onPress={finishSession} />
+          <AppButton label={isAnalyzing ? "Analyzing session…" : "Finish & analyze"} onPress={finishSession} />
         </View>
       )}
 
@@ -297,6 +341,7 @@ export default function App() {
           <Text style={styles.title}>Nice work.</Text>
           <Text style={styles.subtitle}>Your result is ready to review.</Text>
 
+          {analysisError && <View style={styles.analysisWarning}><Text style={styles.analysisWarningText}>{analysisError}</Text></View>}
           <View style={styles.resultHero}>
             <Text style={styles.resultNumber}>{Math.max(0, completedSession.totalTouches + adjustment)}</Text>
             <Text style={styles.resultLabel}>TOTAL TOUCHES</Text>
@@ -426,6 +471,8 @@ const styles = StyleSheet.create({
   manualTitle: { color: "#F4FFF8", fontWeight: "800" },
   manualText: { color: "#8FA39A", fontSize: 12, lineHeight: 17, marginTop: 4 },
   touchButtons: { flexDirection: "row", gap: 10, marginTop: 13 },
+  analysisWarning: { backgroundColor: "#3B2B10", borderWidth: 1, borderColor: "#8E6C25", borderRadius: 14, padding: 13 },
+  analysisWarningText: { color: "#FFE19A", fontSize: 12, lineHeight: 17 },
   resultHero: { backgroundColor: "#13382A", borderRadius: 24, padding: 26, alignItems: "center" },
   resultNumber: { color: "#D5FF61", fontSize: 72, fontWeight: "900", lineHeight: 76 },
   resultLabel: { color: "#B8F9D1", letterSpacing: 1.4, fontSize: 11, fontWeight: "900" },

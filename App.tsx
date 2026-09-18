@@ -177,7 +177,10 @@ export default function App() {
       const promise = cameraRef.current.recordAsync({ maxDuration: 120 });
       recordingPromise.current = promise;
       promise
-        .catch(() => setAnalysisError("The camera could not record this session."))
+        .catch(() => {
+          if (recordingPromise.current === promise) recordingPromise.current = null;
+          setAnalysisError("Recording could not start. Wait two seconds after the preview appears, then try again.");
+        })
         .finally(() => setIsRecording(false));
     } catch {
       setIsRecording(false);
@@ -186,11 +189,17 @@ export default function App() {
   };
 
   const finishSession = async () => {
+    const activeRecording = recordingPromise.current;
+    if (!activeRecording) {
+      setAnalysisError("No recording is active yet. Tap Start recording first.");
+      return;
+    }
+
     setIsAnalyzing(true);
     cameraRef.current?.stopRecording();
     let clip: { uri: string } | undefined;
     try {
-      clip = await recordingPromise.current;
+      clip = await activeRecording;
     } catch {
       setAnalysisError("The camera recording did not complete. Please try again.");
     }
@@ -341,6 +350,7 @@ export default function App() {
             <Text style={styles.streakText}>Current streak: {currentStreak(touches)} · Best: {bestStreak(touches)}</Text>
           </View>
 
+          {analysisError && <View style={styles.analysisWarning}><Text style={styles.analysisWarningText}>{analysisError}</Text></View>}
           <View style={styles.manualCard}>
             <Text style={styles.manualTitle}>{isRecording ? "Recording session" : "Camera preview"}</Text>
             <Text style={styles.manualText}>{isRecording ? "Keep the ball and both ankles visible. Finish when your round is complete." : "Once you can see the live preview, tap Start recording when you are positioned and ready."}</Text>

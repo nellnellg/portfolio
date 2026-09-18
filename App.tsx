@@ -125,10 +125,10 @@ export default function App() {
   const visionApiUrl = process.env.EXPO_PUBLIC_VISION_API_URL;
 
   useEffect(() => {
-    if (screen !== "training") return;
+    if (screen !== "training" || !isRecording) return;
     const timer = setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => clearInterval(timer);
-  }, [screen]);
+  }, [screen, isRecording]);
 
   const counts = useMemo(
     () => ({
@@ -184,12 +184,6 @@ export default function App() {
       setAnalysisError("The camera is still preparing. Please start the session again.");
     }
   };
-
-  useEffect(() => {
-    if (screen !== "training" || !cameraReady || recordingPromise.current) return;
-    const delay = setTimeout(startRecording, 250);
-    return () => clearTimeout(delay);
-  }, [screen, cameraReady]);
 
   const finishSession = async () => {
     setIsAnalyzing(true);
@@ -348,10 +342,14 @@ export default function App() {
           </View>
 
           <View style={styles.manualCard}>
-            <Text style={styles.manualTitle}>Automatic analysis</Text>
-            <Text style={styles.manualText}>Your clip is analyzed when you finish. The video is deleted by the local service after processing.</Text>
+            <Text style={styles.manualTitle}>{isRecording ? "Recording session" : cameraReady ? "Camera ready" : "Preparing camera"}</Text>
+            <Text style={styles.manualText}>{isRecording ? "Keep the ball and both ankles visible. Finish when your round is complete." : cameraReady ? "Tap Start recording when you are positioned and ready." : "Waiting for the iPhone camera to finish starting."}</Text>
           </View>
-          <AppButton label={isAnalyzing ? "Analyzing session…" : "Finish & analyze"} onPress={finishSession} />
+          {isRecording ? (
+            <AppButton label={isAnalyzing ? "Analyzing session…" : "Finish & analyze"} onPress={finishSession} />
+          ) : (
+            <AppButton label={cameraReady ? "Start recording" : "Preparing camera…"} onPress={startRecording} />
+          )}
         </View>
       )}
 

@@ -177,9 +177,10 @@ export default function App() {
       const promise = cameraRef.current.recordAsync({ maxDuration: 120 });
       recordingPromise.current = promise;
       promise
-        .catch(() => {
+        .catch((error: unknown) => {
           if (recordingPromise.current === promise) recordingPromise.current = null;
-          setAnalysisError("Recording could not start. Wait two seconds after the preview appears, then try again.");
+          const detail = error instanceof Error ? error.message : "Unknown camera error";
+          setAnalysisError("Recording could not start: " + detail);
         })
         .finally(() => setIsRecording(false));
     } catch {
@@ -330,6 +331,7 @@ export default function App() {
           <View style={styles.cameraFrame}>
             <CameraView
               active
+              mode="video"
               autofocus="on"
               facing={cameraMode === "tripod" ? "back" : "front"}
               onCameraReady={() => setCameraReady(true)}

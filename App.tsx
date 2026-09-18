@@ -117,6 +117,7 @@ export default function App() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const recordingPromise = useRef<Promise<{ uri: string } | undefined> | null>(null);
@@ -149,6 +150,7 @@ export default function App() {
 
     setCameraDenied(false);
     setAnalysisError(null);
+    setCameraReady(false);
     setTouches([]);
     setElapsed(0);
     setAdjustment(0);
@@ -168,18 +170,36 @@ export default function App() {
   };
 
   const startRecording = () => {
-    if (!cameraRef.current || recordingPromise.current) return;
-    setIsRecording(true);
-    recordingPromise.current = cameraRef.current.recordAsync({ maxDuration: 120 });
-    recordingPromise.current
-      .catch(() => setAnalysisError("The camera could not record this session."))
-      .finally(() => setIsRecording(false));
+    if (!cameraReady || !cameraRef.current || recordingPromise.current) return;
+
+    try {
+      setIsRecording(true);
+      const promise = cameraRef.current.recordAsync({ maxDuration: 120 });
+      recordingPromise.current = promise;
+      promise
+        .catch(() => setAnalysisError("The camera could not record this session."))
+        .finally(() => setIsRecording(false));
+    } catch {
+      setIsRecording(false);
+      setAnalysisError("The camera is still preparing. Please start the session again.");
+    }
   };
+
+  useEffect(() => {
+    if (screen !== "training" || !cameraReady || recordingPromise.current) return;
+    const delay = setTimeout(startRecording, 250);
+    return () => clearTimeout(delay);
+  }, [screen, cameraReady]);
 
   const finishSession = async () => {
     setIsAnalyzing(true);
     cameraRef.current?.stopRecording();
-    const clip = await recordingPromise.current;
+    let clip: { uri: string } | undefined;
+    try {
+      clip = await recordingPromise.current;
+    } catch {
+      setAnalysisError("The camera recording did not complete. Please try again.");
+    }
     recordingPromise.current = null;
     await adapter.stop();
 
@@ -309,7 +329,7 @@ export default function App() {
               active
               autofocus="on"
               facing={cameraMode === "tripod" ? "back" : "front"}
-              onCameraReady={startRecording}
+              onCameraReady={() => setCameraReady(true)}
               ref={cameraRef}
               style={styles.cameraPreview}
             />
